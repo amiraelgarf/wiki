@@ -87,7 +87,7 @@ app.MapGet("/", (HttpContext context, Wiki wiki, Render render) =>
 });
 
 //load login page 
-app.MapGet("/auth/login", (Render render, HttpContext context, IAntiforgery antiForgery) =>
+app.MapGet("/login", (Render render, HttpContext context, IAntiforgery antiForgery) =>
 {
     return Results.Text(render.BuildPage(LogInPageName, atBody: () => new[]
     {
@@ -97,7 +97,7 @@ app.MapGet("/auth/login", (Render render, HttpContext context, IAntiforgery anti
 });
 
 //load register page 
-app.MapGet("/auth/register", (Render render, HttpContext context, IAntiforgery antiForgery) =>
+app.MapGet("/register", (Render render, HttpContext context, IAntiforgery antiForgery) =>
 {
     return Results.Text(render.BuildPage(RegisterPageName, atBody: () => new[]
     {
@@ -106,7 +106,7 @@ app.MapGet("/auth/register", (Render render, HttpContext context, IAntiforgery a
     ).ToString(), HtmlMime);
 });
 
-app.MapPost("/auth/login", async (Wiki wiki, HttpContext context, Render render, IAntiforgery antiForgery) =>
+app.MapPost("/login", async (Wiki wiki, HttpContext context, Render render, IAntiforgery antiForgery) =>
 {
     await antiForgery.ValidateRequestAsync(context);
 
@@ -153,7 +153,7 @@ app.MapPost("/auth/login", async (Wiki wiki, HttpContext context, Render render,
 });
 
 
-app.MapPost("/auth/register", async (Wiki wiki, HttpContext context, Render render, IAntiforgery antiForgery) =>
+app.MapPost("/register", async (Wiki wiki, HttpContext context, Render render, IAntiforgery antiForgery) =>
 {
     await antiForgery.ValidateRequestAsync(context);
 
@@ -184,7 +184,7 @@ app.MapPost("/auth/register", async (Wiki wiki, HttpContext context, Render rend
     }
 
     
-    return Results.Redirect("/auth/login");
+    return Results.Redirect("/login");
 });
 
 
@@ -302,7 +302,7 @@ app.MapGet("/{pageName}", (string pageName, HttpContext context, Wiki wiki, Rend
         }
         else
         {
-            return Results.Redirect("/auth/login");
+            return Results.Redirect("/login");
         }
         
     }
@@ -635,12 +635,12 @@ static string BuildAuthForm(bool isLogin, AntiforgeryTokenSet antiForgery, Model
     var toLoginLink = Div
         .Style("margin-top", "8px")
         .Append("Already registered? ")
-        .Append(A.Class("login-btn").Append("Login").Href("/auth/login"));
+        .Append(A.Class("login").Append("Login").Href("/login"));
 
     var toRegisterLink = Div
         .Style("margin-top", "8px")
         .Append("Don't have an account? ")
-        .Append(A.Class("register-btn").Append("Register").Href("/auth/register"));
+        .Append(A.Class("register").Append("Register").Href("/register"));
 
     var problemMessage = Div.Class("uk-form-danger uk-text-small").Append(err);
 
@@ -722,141 +722,141 @@ class Render
 
     (Template head, Template body, Template authBody, Template layout) _templates = (
         head: Scriban.Template.Parse(@"
-    <meta charset=""utf-8"">
-    <meta name=""viewport"" content=""width=device-width, initial-scale=1"">
-    <title>{{ title }}</title>
-    <link rel=""stylesheet"" href=""https://cdn.jsdelivr.net/npm/uikit@3.19.4/dist/css/uikit.min.css"">
-    <link rel=""stylesheet"" href=""styles.css"">
-    <link href=""https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css"" rel=""stylesheet""
-        integrity=""sha384-QWTKZyjpPEjISv5WaRU9OFeRpok6YctnYmDr5pNlyT2bRjXh0JMhjY6hW+ALEwIH"" crossorigin=""anonymous"">
+            <meta charset=""utf-8"">
+            <meta name=""viewport"" content=""width=device-width, initial-scale=1"">
+            <title>{{ title }}</title>
+            <link rel=""stylesheet"" href=""https://cdn.jsdelivr.net/npm/uikit@3.19.4/dist/css/uikit.min.css"">
+            <link rel=""stylesheet"" href=""styles.css"">
+            <link href=""https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css"" rel=""stylesheet""
+                integrity=""sha384-QWTKZyjpPEjISv5WaRU9OFeRpok6YctnYmDr5pNlyT2bRjXh0JMhjY6hW+ALEwIH"" crossorigin=""anonymous"">
 
-    <script src=""https://cdn.jsdelivr.net/npm/@popperjs/core@2.9.2/dist/umd/popper.min.js""
-        integrity=""sha384-IQsoLXl5PILFhosVNubq5LC7Qb9DXgDA9i+tQ8Zj3iwWAwPtgFTxbJ8NT4GN1R8p""
-        crossorigin=""anonymous""></script>
-    <script src=""https://cdn.jsdelivr.net/npm/bootstrap@5.0.2/dist/js/bootstrap.min.js""
-        integrity=""sha384-cVKIPhGWiC2Al4u+LWgxfKTRIcfu0JTxR+EQDz/bgldoEyl4H0zUF0QKbrJ0EcQF""
-        crossorigin=""anonymous""></script>
+            <script src=""https://cdn.jsdelivr.net/npm/@popperjs/core@2.9.2/dist/umd/popper.min.js""
+                integrity=""sha384-IQsoLXl5PILFhosVNubq5LC7Qb9DXgDA9i+tQ8Zj3iwWAwPtgFTxbJ8NT4GN1R8p""
+            crossorigin=""anonymous""></script>
+            <script src=""https://cdn.jsdelivr.net/npm/bootstrap@5.0.2/dist/js/bootstrap.min.js""
+                integrity=""sha384-cVKIPhGWiC2Al4u+LWgxfKTRIcfu0JTxR+EQDz/bgldoEyl4H0zUF0QKbrJ0EcQF""
+                crossorigin=""anonymous""></script>
 
-    {{ header }}
-    <style>
-        .last-modified { font-size: small; }
-        a:visited { color: blue; }
-        a:link { color: red; }
-        .login-container {
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            height: 100vh;
-        }
-        .login-card {
-            border: none;
-            border-radius: 10px;
-            display: flex;
-            flex-direction: column;
-            width: 500px;
-            max-width: 90%;
-            padding: 2rem;
-            box-shadow: 0 4px 8px 0 rgba(0, 0, 0, 0.2);
-            background-color: white;
-            transition: box-shadow 0.3s ease-in-out;
-        }
-        .login-card:hover {
-            box-shadow: 0 8px 16px 0 rgba(0, 0, 0, 0.3);
-        }
-        .login-card h2 {
-            margin-bottom: 1.5rem;
-            font-size: 1.5rem;
-            text-align: center;
-        }
-        .login-card form {
-            display: flex;
-            flex-direction: column;
-        }
-        .login-card input[type=""text""], .login-card input[type=""password""], .login-card input[type=""email""]] {
-            margin-bottom: 1rem;
-            padding: 0.75rem;
-            border: 1px solid #ccc;
-            border-radius: 5px;
-            font-size: 1rem;
-        }
-        .login-card input[type=""submit""] {
-            padding: 0.75rem;
-            border: none;
-            border-radius: 5px;
-            background-color: #007bff;
-            color: white;
-            font-size: 1rem;
-            cursor: pointer;
-            transition: background-color 0.3s ease-in-out;
-        }
-        .login-card input[type=""submit""]:hover {
-            background-color: #0056b3;
-        }
-        .navbar-item-container {
-            display: flex;
-            flex-wrap: wrap;
-            align-items: center;
-            gap: 10px;
-            flex: 1;
-        }
-        .navbar-item-container form {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 10px;
-            align-items: center;
-            flex: 1;
-        }
-        .navbar-item-container input[type=""text""] {
-            flex: 1;
-            min-width: 0px;
-            padding: 0.5rem;
-            max-width: 50%;
-            margin-left: 10%;
-        }
-        .login-btn, .register-btn {
-            border: none;
-            background-color: transparent;
-            padding: 0;
-            color: rgb(13, 110, 253);
-            text-decoration: none;
-        }
-        .login-btn, .register-btn:hover {
-            background-color: #0056b3;
-        }
-        .navbar-item-container input[type=""submit""],
-        .navbar-item-container .logout-btn {
-            padding: 0.5rem 1rem;
-            border: none;
-            border-radius: 5px;
-            background-color: #007bff;
-            color: white;
-            cursor: pointer;
-            transition: background-color 0.3s ease-in-out;
-            margin: 5px;
-        }
-        .uk-button-small{
-            padding: 0.5rem 1rem;
-            border: none;
-            border-radius: 5px;
-            background-color: #007bff;
-            color: white;
-            cursor: pointer;
-            width: 100px;
-        }
-        .logout-btn:hover, .uk-button-smaill:hover {
-            background-color: #0056b3;
-        }
-        @media (max-width: 768px) {
-            .navbar-item-container {
-                flex-direction: column;
-                align-items: stretch;
-            }
-            .navbar-item-container form {
-                width: 100%;
-            }
-        }
-    </style>
-"),
+            {{ header }}
+            <style>
+                .last-modified { font-size: small; }
+                a:visited { color: blue; }
+                a:link { color: red; }
+                .login-container {
+                    display: flex;
+                    justify-content: center;
+                    align-items: center;
+                    height: 100vh;
+                }
+                .login-card {
+                    border: none;
+                    border-radius: 10px;
+                    display: flex;
+                    flex-direction: column;
+                    width: 500px;
+                    max-width: 90%;
+                    padding: 2rem;
+                    box-shadow: 0 4px 8px 0 rgba(0, 0, 0, 0.2);
+                    background-color: white;
+                    transition: box-shadow 0.3s ease-in-out;
+                }
+                .login-card:hover {
+                    box-shadow: 0 8px 16px 0 rgba(0, 0, 0, 0.3);
+                }
+                .login-card h2 {
+                    margin-bottom: 1.5rem;
+                    font-size: 1.5rem;
+                    text-align: center;
+                }
+                .login-card form {
+                    display: flex;
+                    flex-direction: column;
+                }
+                .login-card input[type=""text""], .login-card input[type=""password""], .login-card input[type=""email""]] {
+                    margin-bottom: 1rem;
+                    padding: 0.75rem;
+                    border: 1px solid #ccc;
+                    border-radius: 5px;
+                    font-size: 1rem;
+                }
+                .login-card input[type=""submit""] {
+                    padding: 0.75rem;
+                    border: none;
+                    border-radius: 5px;
+                    background-color: #007bff;
+                    color: white;
+                    font-size: 1rem;
+                    cursor: pointer;
+                    transition: background-color 0.3s ease-in-out;
+                }
+                .login-card input[type=""submit""]:hover {
+                    background-color: #0056b3;
+                }
+                .navbar-item-container {
+                    display: flex;
+                    flex-wrap: wrap;
+                    align-items: center;
+                    gap: 10px;
+                    flex: 1;
+                }
+                .navbar-item-container form {
+                    display: flex;
+                    flex-wrap: wrap;
+                    gap: 10px;
+                    align-items: center;
+                    flex: 1;
+                }
+                .navbar-item-container input[type=""text""] {
+                    flex: 1;
+                    min-width: 0px;
+                    padding: 0.5rem;
+                    max-width: 50%;
+                    margin-left: 10%;
+                }
+                .login-btn, .register-btn {
+                    border: none;
+                    background-color: transparent;
+                    padding: 0;
+                    color: rgb(13, 110, 253);
+                    text-decoration: none;
+                }
+                .login-btn, .register-btn:hover {
+                    background-color: #0056b3;
+                }
+                .navbar-item-container input[type=""submit""],
+                .navbar-item-container .logout-btn {
+                    padding: 0.5rem 1rem;
+                    border: none;
+                    border-radius: 5px;
+                    background-color: #007bff;
+                    color: white;
+                    cursor: pointer;
+                    transition: background-color 0.3s ease-in-out;
+                    margin: 5px;
+                }
+                .uk-button-small{
+                    padding: 0.5rem 1rem;
+                    border: none;
+                    border-radius: 5px;
+                    background-color: #007bff;
+                    color: white;
+                    cursor: pointer;
+                    width: 100px;
+                }
+                .logout-btn:hover, .uk-button-smaill:hover {
+                    background-color: #0056b3;
+                }
+                @media (max-width: 768px) {
+                    .navbar-item-container {
+                        flex-direction: column;
+                        align-items: stretch;
+                    }
+                    .navbar-item-container form {
+                        width: 100%;
+                    }
+                }
+            </style>
+        "),
 
         body: Scriban.Template.Parse(@"
             <nav class=""uk-navbar-container"">
@@ -891,10 +891,10 @@ class Render
                         {{ else }}
                         <div class=""uk-navbar-right"">
                             <div class=""uk-navbar-item"">
-                                <a style=""color: white;"" href=""/auth/login"" class=""uk-button uk-button-small"">Login</a>
+                                <a style=""color: white;"" href=""/login"" class=""uk-button uk-button-small"">Login</a>
                             </div>
                             <div class=""uk-navbar-item"">
-                                <a style=""color: white;"" href=""/auth/register"" class=""uk-button uk-button-small"">Register</a>
+                                <a style=""color: white;"" href=""/register"" class=""uk-button uk-button-small"">Register</a>
                             </div>
                         </div>
                         {{ end }}
