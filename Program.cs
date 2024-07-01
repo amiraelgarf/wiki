@@ -188,7 +188,7 @@ app.MapPost("/register", async (Wiki wiki, HttpContext context, Render render, I
 });
 
 
-app.MapPost("/auth/logout", async (HttpContext context) =>
+app.MapPost("/logout", async (HttpContext context) =>
 {
     await context.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
 
@@ -674,7 +674,7 @@ static string BuildAuthForm(bool isLogin, AntiforgeryTokenSet antiForgery, Model
     var submitButton = Button.Class("uk-button uk-button-primary").Type("submit").Append(isLogin ? "Login" : "Register");
     var form = Form.Class("uk-form-stacked login-card")
         .Attribute("method", "post")
-        .Attribute("action", $"/auth/{path}")
+        .Attribute("action", $"/{path}")
         .Append(H1.Append(isLogin ? "Login" : "Register"))
         .Append(antiForgeryField)
         .Append(usernameField)
@@ -882,7 +882,7 @@ class Render
                         <div class=""uk-navbar-right"">
                             <div class=""uk-navbar-item"">
                                 <div class=""navbar-item-container"">
-                                    <form method=""post"" action=""/auth/logout"">
+                                    <form method=""post"" action=""/logout"">
                                         <input type=""submit"" class=""logout-btn"" value=""Logout"">
                                     </form>
                                 </div>
