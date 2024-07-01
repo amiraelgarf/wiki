@@ -4,6 +4,19 @@ using Ganss.Xss;
 using HtmlBuilders;
 using LiteDB;
 using Markdig;
+using Markdig.SyntaxHighlighting;
+using Markdig.Extensions.Tables;
+using Markdig.Extensions.Emoji;
+using Markdig.Extensions.SmartyPants;
+using Markdig.Extensions.Mathematics;
+using Markdig.Extensions.AutoIdentifiers;
+using Markdig.Renderers.Normalize;
+using Markdig.Renderers;
+using Markdig.Syntax;
+using Markdig.Parsers;
+using Markdig.Renderers.Html;
+using Markdig.Renderers.Html.Inlines;
+using System.Collections.Generic;
 using Microsoft.AspNetCore.Antiforgery;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Builder;
@@ -426,8 +439,19 @@ static string[] AllPagesForEditing(Wiki wiki)
 
 static string RenderMarkdown(string str)
 {
-    var sanitizer = new HtmlSanitizer();
-    return sanitizer.Sanitize(Markdown.ToHtml(str, new MarkdownPipelineBuilder().UseSoftlineBreakAsHardlineBreak().UseAdvancedExtensions().Build()));
+    var pipeline = new MarkdownPipelineBuilder()
+        .UsePipeTables() 
+        .UseEmojiAndSmiley() 
+        .UseSmartyPants() 
+        .UseSoftlineBreakAsHardlineBreak() 
+        .UseAdvancedExtensions()
+        .Use(new SyntaxHighlightingExtension()) 
+        .Build();
+
+    
+    var html = Markdown.ToHtml(str, pipeline);
+
+    return html;
 }
 
 static string RenderPageContent(Page page) => RenderMarkdown(page.Content);
@@ -819,8 +843,7 @@ class Render
             cursor: pointer;
             width: 100px;
         }
-        .navbar-item-container input[type=""submit""]:hover,
-        .navbar-item-container:hover, .logout-btn:hover, .uk-button-smaill:hover {
+        .logout-btn:hover, .uk-button-smaill:hover {
             background-color: #0056b3;
         }
         @media (max-width: 768px) {
