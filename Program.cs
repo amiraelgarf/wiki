@@ -5,6 +5,7 @@ using HtmlBuilders;
 using LiteDB;
 using Markdig;
 using Markdig.SyntaxHighlighting;
+using Markdig.Extensions.MediaLinks;
 using Markdig.Extensions.Tables;
 using Markdig.Extensions.Emoji;
 using Markdig.Extensions.SmartyPants;
@@ -70,7 +71,7 @@ app.MapGet("/", (HttpContext context, Wiki wiki, Render render) =>
 {
     Page? page = wiki.GetPage(HomePageName);
     var isLogged = isLoggedIn(context);
-    
+
     if (page is not object)
         return Results.Redirect($"/{HomePageName}");
 
@@ -89,11 +90,22 @@ app.MapGet("/", (HttpContext context, Wiki wiki, Render render) =>
 //load login page 
 app.MapGet("/login", (Render render, HttpContext context, IAntiforgery antiForgery) =>
 {
-    return Results.Text(render.BuildPage(LogInPageName, atBody: () => new[]
+    var query = context.Request.Query;
+    string successMessage = query.ContainsKey("success") ? query["success"].ToString() : string.Empty;
+
+    var bodyContent = new List<string>();
+
+    if (!string.IsNullOrEmpty(successMessage))
     {
-        BuildAuthForm(true, antiForgery.GetAndStoreTokens(context))
+        bodyContent.Add($"<div class='alert alert-success' id = 'successMessage'>{successMessage}</div>");
+
     }
-    ).ToString(), HtmlMime);
+
+    bodyContent.Add(BuildAuthForm(true, antiForgery.GetAndStoreTokens(context)).ToString());
+
+    string formHtml = render.BuildPage(LogInPageName, atBody: () => bodyContent).ToString();
+
+    return Results.Text(formHtml, HtmlMime);
 });
 
 //load register page 
@@ -125,7 +137,7 @@ app.MapPost("/login", async (Wiki wiki, HttpContext context, Render render, IAnt
         return Results.Text(formHtml, HtmlMime);
     }
 
-    
+
     var (isOk, user, ex) = wiki.UserLogin(input);
     if (!isOk)
     {
@@ -136,7 +148,7 @@ app.MapPost("/login", async (Wiki wiki, HttpContext context, Render render, IAnt
         return Results.Text(formHtml, HtmlMime);
     }
 
-    
+
     var claims = new List<Claim>
     {
         new Claim(ClaimTypes.Name, user!.Username)
@@ -148,7 +160,7 @@ app.MapPost("/login", async (Wiki wiki, HttpContext context, Render render, IAnt
     };
     await context.SignInAsync(CookieAuthenticationDefaults.AuthenticationScheme, new ClaimsPrincipal(claimsIdentity), authProperties);
 
-    
+
     return Results.Redirect("/");
 });
 
@@ -172,7 +184,7 @@ app.MapPost("/register", async (Wiki wiki, HttpContext context, Render render, I
         return Results.Text(formHtml, HtmlMime);
     }
 
-    
+
     var (isOk, ex) = wiki.UserRegister(input);
     if (!isOk)
     {
@@ -182,9 +194,12 @@ app.MapPost("/register", async (Wiki wiki, HttpContext context, Render render, I
         }).ToString();
         return Results.Text(formHtml, HtmlMime);
     }
+    else
+    {
+        string successMessage = "User registered successfully";
+        return Results.Redirect($"/login?success={Uri.EscapeDataString(successMessage)}");
+    }
 
-    
-    return Results.Redirect("/login");
 });
 
 
@@ -257,7 +272,7 @@ app.MapGet("/attachment", (string fileId, Wiki wiki) =>
 {
     var file = wiki.GetFile(fileId);
     if (file is not object)
-      return Results.NotFound();
+        return Results.NotFound();
 
     app!.Logger.LogInformation("Attachment " + file.Value.meta.Id + " - " + file.Value.meta.Filename);
 
@@ -304,7 +319,7 @@ app.MapGet("/{pageName}", (string pageName, HttpContext context, Wiki wiki, Rend
         {
             return Results.Redirect("/login");
         }
-        
+
     }
 });
 
@@ -330,7 +345,7 @@ app.MapPost("/delete-page", async (HttpContext context, IAntiforgery antiForgery
     return Results.Redirect("/");
 });
 
-app.MapPost("/delete-attachment", async (HttpContext context, IAntiforgery antiForgery, Wiki wiki)=>
+app.MapPost("/delete-attachment", async (HttpContext context, IAntiforgery antiForgery, Wiki wiki) =>
 {
     await antiForgery.ValidateRequestAsync(context);
     var id = context.Request.Form["Id"];
@@ -367,7 +382,7 @@ app.MapPost("/delete-attachment", async (HttpContext context, IAntiforgery antiF
 });
 
 // Add or update a wiki page
-app.MapPost("/{pageName}", async (HttpContext context, Wiki wiki, Render render, IAntiforgery antiForgery)  =>
+app.MapPost("/{pageName}", async (HttpContext context, Wiki wiki, Render render, IAntiforgery antiForgery) =>
 {
     var pageName = context.Request.RouteValues["pageName"] as string ?? "";
     await antiForgery.ValidateRequestAsync(context);
@@ -440,15 +455,16 @@ static string[] AllPagesForEditing(Wiki wiki)
 static string RenderMarkdown(string str)
 {
     var pipeline = new MarkdownPipelineBuilder()
-        .UsePipeTables() 
-        .UseEmojiAndSmiley() 
-        .UseSmartyPants() 
-        .UseSoftlineBreakAsHardlineBreak() 
+        .UsePipeTables()
+        .UseEmojiAndSmiley()
+        .UseSmartyPants()
+        .UseSoftlineBreakAsHardlineBreak()
         .UseAdvancedExtensions()
-        .Use(new SyntaxHighlightingExtension()) 
+        .UseMediaLinks()
+        .Use(new SyntaxHighlightingExtension())
         .Build();
 
-    
+
     var html = Markdown.ToHtml(str, pipeline);
 
     return html;
@@ -741,7 +757,16 @@ class Render
             <style>
                 .last-modified { font-size: small; }
                 a:visited { color: blue; }
-                a:link { color: red; }
+                a:link:not(.uk-button) {
+                    color: red;
+                }
+                .alert-success {
+                    position: fixed;
+                    bottom: 20px;
+                    left: 50%;
+                    transform: translateX(-50%);
+                    z-index: 1000;
+                }
                 .login-container {
                     display: flex;
                     justify-content: center;
@@ -856,6 +881,14 @@ class Render
                     }
                 }
             </style>
+            <script>
+                setTimeout(function() {
+                    var element = document.getElementById('successMessage');
+                    if (element) {
+                        element.remove();
+                    }
+                }, 3000);
+            </script>
         "),
 
         body: Scriban.Template.Parse(@"
@@ -1182,10 +1215,11 @@ class Wiki
         }
     }
 
-    public (bool isOk,User? user, Exception? ex) UserLogin( LoginInput loginInput)
+    public (bool isOk, User? user, Exception? ex) UserLogin(LoginInput loginInput)
     {
-        try {
-            using var db = new LiteDatabase (GetDbPath());
+        try
+        {
+            using var db = new LiteDatabase(GetDbPath());
 
             var coll = db.GetCollection<User>(UserCollectionName);
             coll.EnsureIndex(x => x.Username);
@@ -1193,19 +1227,21 @@ class Wiki
             if (user == null)
             {
                 return (false, null, new Exception("no user with this username"));
-                
-            }else if (!BCrypt.Net.BCrypt.Verify(loginInput.Password, user.Password))
+
+            }
+            else if (!BCrypt.Net.BCrypt.Verify(loginInput.Password, user.Password))
             {
                 return (false, null, new Exception("wrong password"));
             }
             return (true, user, null);
-        }catch (Exception ex)
+        }
+        catch (Exception ex)
         {
-            return (false, null , ex);
+            return (false, null, ex);
         }
     }
 
-    public (bool isOk, Exception? ex) UserRegister( RegisterInput registerInput)
+    public (bool isOk, Exception? ex) UserRegister(RegisterInput registerInput)
     {
         try
         {
@@ -1229,7 +1265,8 @@ class Wiki
             coll.Insert(user);
             return (true, null);
         }
-        catch (Exception ex) {
+        catch (Exception ex)
+        {
             return (false, ex);
         }
     }
