@@ -18,6 +18,8 @@ using Markdig.Parsers;
 using Markdig.Renderers.Html;
 using Markdig.Renderers.Html.Inlines;
 using System.Collections.Generic;
+using Markdig.Syntax.Inlines;
+using System.IO;
 using Microsoft.AspNetCore.Antiforgery;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Builder;
@@ -322,7 +324,6 @@ app.MapGet("/{pageName}", (string pageName, HttpContext context, Wiki wiki, Rend
 
     }
 });
-
 // Delete a page
 app.MapPost("/delete-page", async (HttpContext context, IAntiforgery antiForgery, Wiki wiki) =>
 {
@@ -462,8 +463,8 @@ static string RenderMarkdown(string str)
         .UseAdvancedExtensions()
         .UseMediaLinks()
         .Use(new SyntaxHighlightingExtension())
+        .Use(new ImageLinkExtension()) 
         .Build();
-
 
     var html = Markdown.ToHtml(str, pipeline);
 
@@ -1037,6 +1038,13 @@ class Wiki
     // Get the location of the LiteDB file.
     string GetDbPath() => Path.Combine(_env.ContentRootPath, "wiki.db");
 
+    // Create a new LiteDatabase instance with shared mode enabled
+    LiteDatabase CreateDatabase()
+    {
+        var connectionString = $"Filename={GetDbPath()};Connection=shared";
+        return new LiteDatabase(connectionString);
+    }
+
     // List all the available wiki pages. It is cached for 30 minutes.
     public List<Page> ListAllPages()
     {
@@ -1045,7 +1053,7 @@ class Wiki
         if (pages is object)
             return pages;
 
-        using var db = new LiteDatabase(GetDbPath());
+        using var db = CreateDatabase();
         var coll = db.GetCollection<Page>(PageCollectionName);
         var items = coll.Query().ToList();
 
@@ -1056,7 +1064,7 @@ class Wiki
     // Get a wiki page based on its path
     public Page? GetPage(string path)
     {
-        using var db = new LiteDatabase(GetDbPath());
+        using var db = CreateDatabase();
         var coll = db.GetCollection<Page>(PageCollectionName);
         coll.EnsureIndex(x => x.Name);
 
@@ -1070,7 +1078,7 @@ class Wiki
     {
         try
         {
-            using var db = new LiteDatabase(GetDbPath());
+            using var db = CreateDatabase();
             var coll = db.GetCollection<Page>(PageCollectionName);
             coll.EnsureIndex(x => x.Name);
 
@@ -1099,12 +1107,10 @@ class Wiki
                 var newPage = new Page
                 {
                     Name = sanitizer.Sanitize(properName),
-                    Content = input.Content, //Do not sanitize on input because it will impact some markdown tag such as >. We do it on the output instead.
-                    LastModifiedUtc = Timestamp()
+                    Content = input.Content,
+                    LastModifiedUtc = Timestamp(),
+                    Attachments = attachment is object ? new List<Attachment> { attachment } : new List<Attachment>()
                 };
-
-                if (attachment is object)
-                    newPage.Attachments.Add(attachment);
 
                 coll.Insert(newPage);
 
@@ -1113,20 +1119,18 @@ class Wiki
             }
             else
             {
-                var updatedPage = existingPage with
-                {
-                    Name = sanitizer.Sanitize(properName),
-                    Content = input.Content, //Do not sanitize on input because it will impact some markdown tag such as >. We do it on the output instead.
-                    LastModifiedUtc = Timestamp()
-                };
-
+                existingPage.Name = sanitizer.Sanitize(properName);
+                existingPage.Content = input.Content;
+                existingPage.LastModifiedUtc = Timestamp();
                 if (attachment is object)
-                    updatedPage.Attachments.Add(attachment);
+                {
+                    existingPage.Attachments.Add(attachment);
+                }
 
-                coll.Update(updatedPage);
+                coll.Update(existingPage);
 
                 _cache.Remove(AllPagesKey);
-                return (true, updatedPage, null);
+                return (true, existingPage, null);
             }
         }
         catch (Exception ex)
@@ -1136,11 +1140,12 @@ class Wiki
         }
     }
 
+
     public (bool isOk, Page? p, Exception? ex) DeleteAttachment(int pageId, string id)
     {
         try
         {
-            using var db = new LiteDatabase(GetDbPath());
+            using var db = CreateDatabase();
             var coll = db.GetCollection<Page>(PageCollectionName);
             var page = coll.FindById(pageId);
             if (page is not object)
@@ -1177,7 +1182,7 @@ class Wiki
     {
         try
         {
-            using var db = new LiteDatabase(GetDbPath());
+            using var db = CreateDatabase();
             var coll = db.GetCollection<Page>(PageCollectionName);
 
             var page = coll.FindById(id);
@@ -1190,7 +1195,7 @@ class Wiki
 
             if (page.Name.Equals(homePageName, StringComparison.OrdinalIgnoreCase))
             {
-                _logger.LogWarning($"Page id {id}  is a home page and elete operation on home page is not allowed");
+                _logger.LogWarning($"Page id {id}  is a home page and delete operation on home page is not allowed");
                 return (false, null);
             }
 
@@ -1206,7 +1211,7 @@ class Wiki
                 return (true, null);
             }
 
-            _logger.LogWarning($"Somehow we cannot delete page id {id} and it's a mistery why.");
+            _logger.LogWarning($"Somehow we cannot delete page id {id} and it's a mystery why.");
             return (false, null);
         }
         catch (Exception ex)
@@ -1219,7 +1224,7 @@ class Wiki
     {
         try
         {
-            using var db = new LiteDatabase(GetDbPath());
+            using var db = CreateDatabase();
 
             var coll = db.GetCollection<User>(UserCollectionName);
             coll.EnsureIndex(x => x.Username);
@@ -1245,7 +1250,7 @@ class Wiki
     {
         try
         {
-            using var db = new LiteDatabase(GetDbPath());
+            using var db = CreateDatabase();
             var coll = db.GetCollection<User>(UserCollectionName);
             coll.EnsureIndex(x => x.Username);
 
@@ -1274,7 +1279,7 @@ class Wiki
     // Return null if file cannot be found.
     public (LiteFileInfo<string> meta, byte[] file)? GetFile(string fileId)
     {
-        using var db = new LiteDatabase(GetDbPath());
+        using var db = CreateDatabase();
 
         var meta = db.FileStorage.FindById(fileId);
         if (meta is not object)
@@ -1397,5 +1402,48 @@ class RegisterInputValidator : AbstractValidator<RegisterInput>
             .Must(x => x.Password == x.ConfirmPassword)
             .WithMessage("Passwords do not match")
             .When(x => !string.IsNullOrEmpty(x.Password) && !string.IsNullOrEmpty(x.ConfirmPassword));
+    }
+}
+
+
+public class ImageLinkExtension : IMarkdownExtension
+{
+    public void Setup(MarkdownPipelineBuilder pipeline)
+    {
+        // No setup needed for the pipeline
+    }
+
+    public void Setup(MarkdownPipeline pipeline, IMarkdownRenderer renderer)
+    {
+        if (renderer is HtmlRenderer htmlRenderer)
+        {
+            htmlRenderer.ObjectRenderers.AddIfNotAlready(new ImageLinkInlineRenderer());
+        }
+    }
+}
+
+public class ImageLinkInlineRenderer : HtmlObjectRenderer<LinkInline>
+{
+    protected override void Write(HtmlRenderer renderer, LinkInline link)
+    {
+        if (link.Url != null && (Path.GetExtension(link.Url).Equals(".jpeg", StringComparison.OrdinalIgnoreCase) ||
+                                 Path.GetExtension(link.Url).Equals(".jpg", StringComparison.OrdinalIgnoreCase) ||
+                                 Path.GetExtension(link.Url).Equals(".png", StringComparison.OrdinalIgnoreCase) ||
+                                 Path.GetExtension(link.Url).Equals(".gif", StringComparison.OrdinalIgnoreCase) ||
+                                 Path.GetExtension(link.Url).Equals(".bmp", StringComparison.OrdinalIgnoreCase)))
+        {
+            renderer.Write("<img src=\"").WriteEscapeUrl(link.Url).Write("\" alt=\"").WriteEscape(link.Title ?? link.Url).Write("\" />");
+        }
+        else
+        {
+            renderer.Write("<a href=\"").WriteEscapeUrl(link.Url).Write("\"");
+            if (!string.IsNullOrEmpty(link.Title))
+            {
+                renderer.Write(" title=\"").WriteEscape(link.Title).Write("\"");
+            }
+            renderer.Write("\">"); // End of <a> opening tag
+            renderer.WriteChildren(link); // Write the children elements
+            renderer.Write("</a>"); // Close the <a> tag
+        }
     }
 }
